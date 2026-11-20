@@ -1,0 +1,383 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype}
+\usepackage[margin=24mm,headheight=15pt]{geometry}
+\usepackage{amsmath,amssymb,booktabs,tabularx,array}
+\usepackage{enumitem,xcolor,fancyhdr,xurl}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+
+\definecolor{ink}{HTML}{182737}
+\definecolor{accent}{HTML}{225878}
+\definecolor{pale}{HTML}{EFF5F7}
+\color{ink}
+\DeclareUnicodeCharacter{2082}{\textsubscript{2}}
+\setlength{\emergencystretch}{4em}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5.5pt}
+\setlist{nosep,leftmargin=1.55em}
+\renewcommand{\arraystretch}{1.25}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{accent}{RIEMANN HYPOTHESIS / LEAN SOURCE GUIDE}}
+\fancyfoot[L]{\small\textcolor{accent}{Independent technical reading notes}}
+\fancyfoot[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.35pt}
+\newcommand{\repo}{https://github.com/LiRunGuo/riemann-lean-verification}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\src}[2]{\href{\repo/blob/main/lean/src/#1}{\mbox{\nolinkurl{#2}}}}
+\newcommand{\evid}[2]{\href{\repo/blob/main/#1}{#2}}
+\newcommand{\cb}{Development/AutomorphicArithmetic/CharacterBoxes}
+\newcommand{\pc}{Development/AutomorphicArithmetic/PrimitiveCosets}
+\newcommand{\lt}{Development/AutomorphicArithmetic/DedekindLFunctions/LandauTheorems}
+\newcommand{\tc}{Development/AutomorphicArithmetic/ThetaCorrespondence/ThetaPairLifts/ThirdPlaceSeries}
+\newcommand{\hc}{Formalism/SharpRestriction/RamificationFrobenius/TotientGaloisClasses}
+\newcommand{\dt}{Development/AutomorphicArithmetic/AutomorphicVarieties/ModularityArgument/ThresholdArguments/DenseThresholdCases}
+\newcommand{\RePart}{\operatorname{Re}}
+\newcommand{\note}[1]{\par\noindent\colorbox{pale}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\small\strut #1\strut}}\par}
+\hypersetup{pdftitle={A Technical Guide to the Lean Riemann Hypothesis Submission},
+pdfsubject={Theorem statements, proof dependencies, and verification evidence},
+pdfkeywords={Riemann hypothesis, Dirichlet L-functions, Lean, formal verification}}
+
+\begin{document}
+\thispagestyle{plain}
+{\large\color{accent} Technical guide \hfill 20 November 2026}\par
+\vspace{8mm}
+{\Huge\bfseries The Riemann hypothesis\par}
+\vspace{2mm}
+{\LARGE A guide to the submitted Lean proof\par}
+\vspace{5mm}
+
+This guide follows the Lean project linked in Levent Alpöge's November 2026
+announcement. It identifies the precise theorem statements, reconstructs the
+analytic deduction, and traces the arithmetic inputs that would establish the
+claimed zero-free region. Linked filenames refer to the archived Lean sources
+in the verification repository. \href{https://alpo.ge/remark.pdf}{Original announcement}
+
+\note{\textbf{Verification status at drafting.} The targeted Yokota run checked
+seven analytic lemmas using only the three standard Lean axioms. The full build
+of the submission's \code{Main} module was still running. The arithmetic
+inputs to the central estimate remain open in this audit.
+\evid{evidence/status.md}{Live verification record}}
+
+\section{What the submission asserts}
+
+\src{Main.lean}{Main.lean} exposes five declarations. The main RH declaration
+has Mathlib's own type \code{RiemannHypothesis}. The Dirichlet assertions
+use Mathlib's \code{DirichletCharacter.LFunction} at every positive modulus.
+
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.46\linewidth}X@{}}
+\toprule
+Lean declaration & Mathematical content \\
+\midrule
+\nolinkurl{riemannHypothesis} & Mathlib's statement of RH. \\
+\nolinkurl{riemannZeta_eq_zero_re} & The same zero condition written out in the submission. \\
+\nolinkurl{LFunction_ne_zero_of_half_lt_re} & Nonvanishing to the right of the critical line, with the principal character at $s=1$ excepted. \\
+\nolinkurl{LFunction_eq_zero_re} & Every zero of every Dirichlet $L$-function in $0<\RePart s<1$ lies on $\RePart s=\tfrac12$. \\
+\nolinkurl{LFunction_eq_zero_re_of_isPrimitive} & The critical-strip assertion restricted to primitive characters. \\
+\bottomrule
+\end{tabularx}
+
+See \src{Statements.lean}{Statements.lean} and
+\href{https://github.com/leanprover-community/mathlib4/blob/0df444a360eaa60ab8c11dca51a86af692955474/Mathlib/NumberTheory/LSeries/RiemannZeta.lean\#L185}{the pinned Mathlib definition of RH}.
+The term GRH in this guide refers to Dirichlet $L$-functions.
+
+\vspace{2mm}
+\textbf{Proof in one line.}
+Construct arithmetic families with controlled cohomology and divisibility,
+obtain a square-root-scale bound for smoothed prime sums on power intervals,
+apply a Landau-type zero-free criterion, and reflect zeros by the functional
+equations.
+
+\clearpage
+\section{The reduction to right-half-plane nonvanishing}
+
+The proof routes RH and the critical-strip assertions through
+\code{UpperTheory.EveryCharacter}. In mathematical notation this proposition is
+\[
+  \forall N\ge 1,\ \forall \chi\pmod N,\ \forall s\in\mathbb C,
+  \qquad
+  \RePart s>\tfrac12,\ (\chi,s)\ne(1,1)
+  \quad\Longrightarrow\quad L(s,\chi)\ne0.
+\]
+The source uses the disjunction $\chi\ne1\lor s\ne1$. The exception handles
+the pole under the conventions of the formalized $L$-function. The equivalent
+right-half-plane input in the final wrapper is \code{Claim.HalfPlane}.
+\src{\cb/EveryCharacter.lean}{EveryCharacter.lean}
+\src{\cb/HalfPlane.lean}{HalfPlane.lean}
+
+\subsection*{Primitive and imprimitive characters}
+
+For a character $\chi$ modulo $N$, let $\chi_*$ be its primitive character of
+conductor $f\mid N$. Passing from $\chi_*$ to $\chi$ introduces a finite product
+of Euler factors of the form $1-\chi_*(p)p^{-s}$. If $\RePart s>0$, then
+\[
+  \bigl|\chi_*(p)p^{-s}\bigr|
+     \le p^{-\RePart s}<1 .
+\]
+No such factor vanishes there. Thus a zero of the imprimitive $L$-function in
+the open strip gives a zero for the primitive inducing character. The same
+factorization extends a primitive right-half-plane result to all characters.
+\src{\cb/ClaimStrip.lean}{ClaimStrip.lean}
+\src{\cb/Imprimitive.lean}{Imprimitive.lean}
+
+For primitive $\psi$, the completed functional equation takes a zero at $s$
+to a zero of the completed function for $\psi^{-1}$ at $1-s$. In the open
+strip, the gamma factor at $s$ is nonzero, so the original $L$-zero gives a
+completed zero. At the reflected point the source rewrites the $L$-function
+as the completed function divided by its gamma factor. If
+$0<\RePart s<\tfrac12$, then $\RePart(1-s)>\tfrac12$, and the reflected point
+contradicts right-half-plane nonvanishing. Zeros with $\RePart s>\tfrac12$
+contradict it directly. The critical line is the remaining case.
+\src{\cb/ClaimStrip.lean}{ClaimStrip.lean}
+
+\subsection*{The zeta function}
+
+The character of modulus $1$ satisfies
+$L(s,\chi)=\zeta(s)$ in Mathlib. The route through
+\code{Formalism.VW.rh\_of\_every} uses this equality and the zeta functional
+equation. Mathlib's RH statement explicitly excludes the negative even
+integers and $s=1$. The source also uses $\zeta(0)\ne0$. An alternative
+reduction, \code{Claim.zeta}, treats the nonpositive half-plane via the
+completed zeta function and the established nonvanishing on $\RePart s\ge1$.
+The reduction audit checked the analytic lemmas underlying both routes.
+\src{Supplements/Kernels/MainTheorems.lean}{MainTheorems.lean}
+\src{Formalism/GammaFactorNonvanishing/CritLine.lean}{CritLine.lean}
+\src{Formalism/GammaFactorNonvanishing/RhOfRight.lean}{RhOfRight.lean}
+
+\clearpage
+\section{The analytic criterion on power intervals}
+
+\subsection*{Smoothing and normalization}
+
+Write $\Lambda(n)$ for the von Mangoldt function. The zeta component is the
+centered sum
+\begin{align*}
+ S_\zeta(x)&=\sum_{n\le x}\Lambda(n)(x/n-1),\\
+ G_\zeta(x)&=S_\zeta(x)-x\log x+(1+\gamma)x,
+\end{align*}
+where $\gamma$ is the Euler--Mascheroni constant. For a nonprincipal character
+the complex version of the centered sum replaces $\Lambda(n)$ by
+$\Lambda(n)\chi(n)$ and adds $xL'(1,\chi)/L(1,\chi)$. The source takes real
+parts and combines a finite family with positive weights. The cyclic level of
+a primitive character includes the primitive characters induced by its
+powers and includes the trivial character. The resulting level sum is
+\code{Level.Gm}. \code{level\_family} identifies that sum with the
+weighted family in the analytic criterion, preserving the zero-free goal.
+\src{Formalism/StatementOC.lean}{StatementOC.lean}
+\src{\hc/Analytic.lean}{Analytic.lean}
+\src{\hc/ExplicitFormulaErrorOfHostConditions.lean}{ExplicitFormulaErrorOfHostConditions.lean}
+\src{\pc/LevelFamily.lean}{LevelFamily.lean}
+
+\subsection*{Why zeros leave uncancelled poles}
+
+For $\RePart s>1$ the smoothing factor satisfies
+\[
+ \int_n^\infty (x/n-1)x^{-s-1}\,dx=\frac{n^{-s}}{s(s-1)}.
+\]
+The Dirichlet series for the smoothed sum therefore enters through
+$-L'(s,\chi)/L(s,\chi)$. At a zero $\rho$ of multiplicity $m$, that logarithmic
+derivative contributes $-m/(s-\rho)$ in its principal part. Centering removes
+the terms at $s=1$. The residues at a zero of the family take the form
+\[
+                  -\frac{S}{\rho(\rho-1)},\qquad S>0 ,
+\]
+where $S$ is a positive weighted sum of multiplicities, including the
+conjugate-character terms used to express real parts. Since all contributions
+at a fixed $\rho$ have the same complex factor, they cannot cancel. In
+particular the residue is positive at a real zero in $(0,1)$. This sign
+matters because the argument uses an upper bound on a real-valued sum.
+\src{\lt/poleData.lean}{poleData.lean}
+
+\subsection*{From a window bound to nonvanishing}
+
+Let $0<\theta<1$ and $\delta>0$. The criterion assumes that for every lower
+threshold there exists a larger $Y$ such that $G_m(y)\le C y^\theta$ on
+the whole interval $[Y,Y^{1+\delta}]$. After $u=\log y$, high derivatives of
+the Laplace transform insert the kernel $u^k\exp(-\sigma u)/k!$.
+The proof chooses $k$ so this kernel concentrates inside
+$[\log Y,(1+\delta)\log Y]$ and bounds the tails. Cauchy estimates compare
+the derivative bound with the growth forced by a nearby pole. The argument
+handles the real-pole case using the positive residue. The conclusion is
+nonvanishing for the family on $\RePart s>\theta$, with the region
+$\RePart s\ge1$ handled by existing theorems.
+\src{\lt/landauTails.lean}{landauTails.lean}
+\src{\lt/landauWindow.lean}{landauWindow.lean}
+\src{\lt/ZeroFreeOfRpowWindow.lean}{ZeroFreeOfRpowWindow.lean}
+
+\clearpage
+\section{What the arithmetic argument must supply}
+
+For the cyclic level $\mathcal L$ of each primitive character, the argument
+requires families of windows on which
+\[
+  G_{\mathcal L}(x)
+     \le x^{1/2+(e_D+e_L+7)\varepsilon}.
+\]
+The final assembly uses the power $\lambda=3/2$ for the windows. The constants
+$e_D,e_L$ are chosen before the quantifier over all sufficiently small
+$\varepsilon>0$. For a candidate zero with real part $\beta>1/2$, the code
+chooses a $\theta$ strictly between $1/2$ and $\min(\beta,1)$ and makes
+$(e_D+e_L+7)\varepsilon$ small enough to apply the analytic criterion.
+The thresholds and the family may depend on $\varepsilon$.
+A bound at isolated points would leave the window hypothesis unmet.
+\src{\hc/TopWin.lean}{TopWin.lean}
+\src{\cb/ZeroFreeAllOfTopG.lean}{ZeroFreeAllOfTopG.lean}
+\src{\tc/TopPlug.lean}{TopPlug.lean}
+
+\subsection*{The bridge from arithmetic data to the bound}
+
+The theorem that produces the quantitative bound is \code{UpperTheory.Comparison₂.core\_gm}.
+It takes two inputs at scale $x$.
+
+\begin{enumerate}
+\item \code{EAtH} relates a level's primitive characters to data on an
+auxiliary arithmetic host and controls comparison errors.
+\item \code{CoreAtH} records a witness with the identities, size bounds,
+and error estimates needed by the prime-sum argument.
+\end{enumerate}
+
+The proof matches the weighted sum to the host expression, applies the
+chain estimate \code{Deduction.ch\_top} and the comparison
+\code{Deduction.ch\_core}, and absorbs fixed factors into the spare powers
+of $x^\varepsilon$. The family-level theorem chooses a suitable member
+for each $x$ in a window. The analytic theorem then consumes the resulting
+inequality and the window quantifiers.
+\par{\small\raggedright \src{\pc/CoreAtH.lean}{CoreAtH.lean}
+\src{\pc/CoreGm.lean}{CoreGm.lean}
+\src{\pc/WindowInequalityOfArtinInputs.lean}{WindowInequalityOfArtinInputs.lean}
+\src{\pc/LevelGmLeOnFamilyScales.lean}{LevelGmLeOnFamilyScales.lean}\par}
+
+\subsection*{How the family requirements are assembled}
+
+\code{zeroFreeAll\_of\_topG} separates the existence of hosts from the
+construction of compatible estimates over a family. The supply argument
+\code{supplyChi} combines a cohomology window for a primitive character
+with admissible arithmetic classes. The other input, \code{TopG}, produces
+the family-level estimates under that supply hypothesis and the relevant
+cohomology bounds. \code{topDesWin} collects the design-existence,
+divisibility, rank and global compatibility hypotheses used to obtain
+\code{ChainTied} witnesses on the windows. These witnesses feed
+\code{CoreAtH}. This is a useful boundary for reviewing whether each
+downstream estimate applies to the hosts that are actually supplied.
+\src{\cb/SupplyChi.lean}{SupplyChi.lean}
+\src{\cb/HostOfField.lean}{HostOfField.lean}
+\src{\cb/DesWin.lean}{DesWin.lean}
+
+\clearpage
+\section{The two arithmetic branches}
+
+\subsection*{Auxiliary fields and the cohomology window}
+
+\code{IsChiField} describes the auxiliary field through an embedding into
+a cyclotomic field and a subgroup condition involving the given character
+and two quadratic conditions. \code{WinPair} prescribes the relative sizes
+and congruence conditions on auxiliary primes $q,d$. The field bound
+\code{VVle} demands finiteness of the relevant lengths and bounds the
+weighted sums over finite prime sets, with weights $\log\ell$.
+Here the length is that of a localization kernel in degree-one Galois
+cohomology for the twist by $-e$. A nontrivial point for review is that
+the field and local data actually constructed for the prime-sum estimate
+meet the conditions of this bound.
+\src{\cb/ExistsPageN.lean}{ExistsPageN.lean}
+\src{Formalism/GaloisCohomology/Statement.lean}{Statement.lean}
+\src{Development/AutomorphicArithmetic/ShortNorms/supplyOfAdmOf.lean}{supplyOfAdmOf.lean}
+
+The proposition \code{VWinAt} supplies a window for each sufficiently small
+$\varepsilon$ and admissible choice of $e(x)$. Its pointwise target
+\code{VAt} uses a cutoff $\lfloor x^{401}\rfloor$ in the specialization
+\code{VWin}, with cohomology bound $\exp(x^\varepsilon/2)$.
+The route through \code{vwin\_of\_row} combines local--global compatibility,
+base change, automorphy inputs and several counting bounds. The proof
+packages these inputs before applying \code{vwin\_of\_counts}.
+\src{\dt/VwinOfRow.lean}{VwinOfRow.lean}
+\src{\dt/WindowBoundOfLiteratureLevel.lean}{WindowBoundOfLiteratureLevel.lean}
+\src{Development/AutomorphicArithmetic/AutomorphicVarieties/HeightAndVanishing/JointWinOfCounts.lean}{JointWinOfCounts.lean}
+
+\subsection*{Theta matching, covolumes and divisibility}
+
+The other branch constructs the hypotheses used for the prime-sum
+comparison. The assembly passes theta-integral agreement and local matching,
+a covolume bound, a local Langlands existence result, and the cohomology
+window to \code{every\_character\_of\_theta\_integrals\_local\_matching}.
+Inside that route the supplied results are used to construct the required
+nonempty family hypotheses. At the design stage,
+\code{divinN\_of\_hypV} turns a cohomology input into divisibility data
+using additional link and rank hypotheses. The window bound depends on
+this compatibility as well as on analytic error estimates.
+\par{\small\raggedright \src{\tc/EveryCharacterOfLiteratureOfVWin.lean}{EveryCharacterOfLiteratureOfVWin.lean}
+\src{\tc/SiegelEisensteinSecondTermHypotheses.lean}{SiegelEisensteinSecondTermHypotheses.lean}
+\src{\cb/DivinNOfHypV.lean}{DivinNOfHypV.lean}\par}
+
+\note{\textbf{Where to start a deeper review.} Check the proof of the
+local--global compatibility row in the form used by \code{vwin\_of\_row},
+then follow one concrete character all the way from \code{VWinAt} to its
+\code{CoreAtH} witness. This tests whether the arithmetic constructions
+supply the same data and uniformity that the analytic comparison consumes.}
+
+\clearpage
+\section{Reading order and verification evidence}
+
+Start from the actual proof terms in \src{Main.lean}{Main.lean}.
+The principal route passes through \code{allChi} in
+\src{Supplements/Kernels/MainTheorems.lean}{MainTheorems.lean} to
+\code{UpperTheory.FinalTheorems.everyCharacter} in
+\src{\cb/MainConclusion.lean}{MainConclusion.lean}.
+The final declaration supplies \code{galoisLocalGlobalStrong\_recParameter}
+from the theta-lift and Galois-representation development. Follow the
+named declarations rather than treating every file imported by a module as
+a direct mathematical premise.
+\src{Development/AutomorphicArithmetic/Foundations/GaloisRepresentations/IntegralStructures/RowSrc.lean}{RowSrc.lean}
+
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.26\linewidth}X@{}}
+\toprule
+Question & Files to open \\
+\midrule
+What is being proved? &
+\src{Main.lean}{Main.lean},
+\src{Statements.lean}{Statements.lean} \\
+How is the upper bound used? &
+\src{\lt/ZeroFreeOfRpowWindow.lean}{ZeroFreeOfRpowWindow.lean},
+\src{\hc/TopWin.lean}{TopWin.lean} \\
+Where is the upper bound assembled? &
+\src{\pc/CoreGm.lean}{CoreGm.lean},
+\src{\cb/ZeroFreeAllOfTopG.lean}{ZeroFreeAllOfTopG.lean} \\
+Where are both branches joined? &
+\src{\cb/MainConclusion.lean}{MainConclusion.lean},
+\src{\tc/EveryCharacterOfLiteratureOfVWin.lean}{EveryCharacterOfLiteratureOfVWin.lean} \\
+\bottomrule
+\end{tabularx}
+
+\subsection*{What has been checked}
+
+{\raggedright
+The isolated reduction job \code{157173} on Yokota completed with exit status
+zero. Lean checked the two conditional deductions from
+\code{Claim.HalfPlane} to RH and Dirichlet GRH. The axiom audit covered
+\code{Claim.prim\_reflect}, \code{Claim.strip}, \code{Claim.zeta},
+\code{Claim.factor\_ne\_zero}, \code{Formalism.VW.rh\_of\_right},
+\code{Deduction.zeroFree\_of\_rpow\_window} and
+\code{UpperTheory.Comparison₂.formB}. Each reported
+\code{propext}, \code{Classical.choice} and \code{Quot.sound}.
+The full job \code{157166} was still compiling the import closure of
+\code{Main} when these notes were drafted. Its recorded procedure checks the
+top-level statements and transitive axioms and then runs
+\code{leanchecker --fresh Main}.
+\evid{evidence/reduction-audit.txt}{Reduction job output}
+\evid{verification/AuditReduction.lean}{Reduction audit source}
+\evid{evidence/status.md}{Full job status}\par}
+
+\subsection*{Reproducibility}
+
+The public archive consists of fourteen concatenated segments. The private
+verification repository preserves 175,187 submitted Lean source files and
+the three project configuration files. The toolchain is Lean \code{v4.33.1},
+and the Mathlib pin is
+\nolinkurl{0df444a360eaa60ab8c11dca51a86af692955474}.
+\evid{evidence/archive.sha256}{Segment checksums}
+\evid{verification/build-on-yokota.sh}{Full build script}
+
+The evidence supports the analytic reductions under their stated inputs.
+The decisive pending check is whether the submitted arithmetic constructions
+supply the window estimate for every required character.
+
+\end{document}

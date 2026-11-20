@@ -4,6 +4,8 @@
 
 ## 阅读源码
 
+- [英文技术导读（A4 PDF）](output/pdf/riemann-lean-guide.pdf)梳理 RH 与 Dirichlet GRH 的证明链、关键估计和验证范围。[LaTeX 源文件](output/pdf/riemann-lean-guide.tex)
+
 - [完整 Lean 项目](lean/)包含原始归档的 175,187 个 Lean 文件和三个项目配置文件。
 - [Main.lean](lean/src/Main.lean)包含五个顶层定理。RH 使用 [Mathlib 的 `RiemannHypothesis`](https://github.com/leanprover-community/mathlib4/blob/0df444a360eaa60ab8c11dca51a86af692955474/Mathlib/NumberTheory/LSeries/RiemannZeta.lean#L185)。
 - [Statements.lean](lean/src/Statements.lean)定义了附带的 ζ 函数与 Dirichlet L 函数命题。
