@@ -1,0 +1,10 @@
+157173|COMPLETED|00:06:25|0:0
+Lean (version 4.33.1, x86_64-unknown-linux-gnu, commit 819816b2e0a3bf405af45ae5c7af2491d8f5bee6, Release)
+Build completed successfully (8840 jobs).
+'Claim.factor_ne_zero' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Claim.prim_reflect' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Claim.strip' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Claim.zeta' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Formalism.VW.rh_of_right' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Deduction.zeroFree_of_rpow_window' depends on axioms: [propext, Classical.choice, Quot.sound]
+'UpperTheory.Comparison₂.formB' depends on axioms: [propext, Classical.choice, Quot.sound]
