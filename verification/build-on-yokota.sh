@@ -97,5 +97,5 @@ if seen != expected:
     raise SystemExit(f"expected axiom reports for {sorted(expected)}; got {sorted(seen)}")
 PYAXIOMS
 printf '\n=== Replay Main and its imports through the Lean kernel ===\n'
-run_isolated lake env leanchecker --fresh Main
+run_isolated lake env leanchecker --verbose --fresh Main
 printf '\n=== All verification commands exited successfully ===\n'
