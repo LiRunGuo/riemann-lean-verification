@@ -2,7 +2,7 @@
 set -euo pipefail
 umask 077
 
-work=${1:?usage: audit-reduction-on-yokota.sh WORK_DIRECTORY}
+work=${1:?usage: audit-reduction-on-slurm.sh WORK_DIRECTORY}
 main=$(cat "$work/build-directory")/lean
 toolchain="$work/elan/toolchains/leanprover--lean4---v4.33.1"
 stage=$(mktemp -d "/tmp/riemann-reduction-$USER.XXXXXX")

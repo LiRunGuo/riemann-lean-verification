@@ -1,10 +1,12 @@
-"""Publish the status of the Yokota run while the local SSH client is online."""
+"""Publish the status of the verification run while the local SSH client is online."""
 
 import argparse
 import base64
 import datetime
 import json
+import os
 import re
+import shlex
 import subprocess
 import time
 
@@ -12,6 +14,11 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("job", type=int)
 parser.add_argument("--preview", action="store_true")
 args = parser.parse_args()
+
+ssh_host = os.environ.get("RIEMANN_SSH_HOST")
+remote_workdir = os.environ.get("RIEMANN_REMOTE_WORKDIR")
+if not ssh_host or not remote_workdir:
+    parser.error("set RIEMANN_SSH_HOST and RIEMANN_REMOTE_WORKDIR locally")
 
 api_path = "repos/LiRunGuo/riemann-lean-verification/contents/evidence/status.md"
 terminal = {
@@ -35,11 +42,14 @@ def run(command, **kwargs):
 def snapshot():
     remote = run([
         "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
-        "yokota_runguoli", "bash", "-s", "--", str(args.job),
+        ssh_host, "bash", "-s", "--", str(args.job), shlex.quote(remote_workdir),
     ], input="""
 set -eu
 job=$1
-work="$HOME/riemann-lean-verification.6wrVzm"
+case $2 in
+    /*) work=$2 ;;
+    *) work="$HOME/$2" ;;
+esac
 sacct -X -j "$job" -n -P -o JobID,State%24,Elapsed,ExitCode
 log="$work/slurm-$job.log"
 if [ -f "$log" ]; then
@@ -54,8 +64,22 @@ fi
     state, elapsed, exit_code = match.groups()
     last_step = next((row for row in rows if re.fullmatch(r"\[\d+/\d+\] Built", row)), None)
     axioms = [row for row in rows if audit_line.fullmatch(row)]
-    stages = [row for row in rows if row.startswith(("=== ", "Build completed successfully", "replaying Main"))]
-    failures = [row for row in rows if row.startswith(("error:", "✖")) or "unexpected axioms" in row]
+    stage_markers = {
+        "=== Build the source dependency closure of Main ===",
+        "=== Check theorem statements and transitive axiom dependencies ===",
+        "=== Replay Main and its imports through the Lean kernel ===",
+        "=== All verification commands exited successfully ===",
+        "replaying Main with --fresh",
+    }
+    stages = [row for row in rows if row in stage_markers or
+              re.fullmatch(r"Build completed successfully \(\d+ jobs\)\.", row)]
+    failures = []
+    if any("no space left on device" in row for row in rows):
+        failures.append("The build reported insufficient disk space.")
+    elif any(row.startswith(("error:", "✖")) for row in rows):
+        failures.append("The build reported errors. Full logs are retained on the runner.")
+    if any("unexpected axioms" in row for row in rows):
+        failures.append("The audit reported an unexpected axiom.")
     completed = (
         state == "COMPLETED" and exit_code == "0:0" and len(axioms) == len(theorems)
         and "=== All verification commands exited successfully ===" in stages
@@ -67,7 +91,7 @@ fi
         if state in terminal else "服务器作业仍在进行，形式化验证结论待定。"
     )
     lines = [
-        "# Yokota 验证状态", "", f"**{result}**", "",
+        "# 验证状态", "", f"**{result}**", "",
         f"- 更新于 {time_utc}", f"- Slurm 作业 `{args.job}`",
         f"- 状态 `{state}`，耗时 `{elapsed}`，退出码 `{exit_code}`",
     ]
@@ -76,8 +100,7 @@ fi
     details = stages + axioms + failures
     if details:
         lines.extend(("", "```text", *details, "```"))
-    lines.extend(("", f"服务器原始日志位于 `~/riemann-lean-verification.6wrVzm/slurm-{args.job}.log`。", ""))
-    return "\n".join(lines), state
+    return "\n".join(lines) + "\n", state
 
 
 while True:
@@ -88,7 +111,7 @@ while True:
             break
         old_sha = run(["gh", "api", api_path, "--jq", ".sha"]).strip()
         body = json.dumps({
-            "message": f"Record Yokota job {args.job} status",
+            "message": f"Record verification job {args.job} status",
             "sha": old_sha,
             "content": base64.b64encode(report.encode()).decode(),
         })

@@ -53,7 +53,7 @@ analytic deduction, and traces the arithmetic inputs that would establish the
 claimed zero-free region. Linked filenames refer to the archived Lean sources
 in the verification repository. \href{https://alpo.ge/remark.pdf}{Original announcement}
 
-\note{\textbf{Verification status at drafting.} The targeted Yokota run checked
+\note{\textbf{Verification status at drafting.} The targeted verification run checked
 seven analytic lemmas using only the three standard Lean axioms. The full build
 of the submission's \code{Main} module was still running. The arithmetic
 inputs to the central estimate remain open in this audit.
@@ -350,7 +350,7 @@ Where are both branches joined? &
 \subsection*{What has been checked}
 
 {\raggedright
-The isolated reduction job \code{157173} on Yokota completed with exit status
+The isolated reduction job \code{157173} completed with exit status
 zero. Lean checked the two conditional deductions from
 \code{Claim.HalfPlane} to RH and Dirichlet GRH. The axiom audit covered
 \code{Claim.prim\_reflect}, \code{Claim.strip}, \code{Claim.zeta},
@@ -368,13 +368,13 @@ top-level statements and transitive axioms and then runs
 
 \subsection*{Reproducibility}
 
-The public archive consists of fourteen concatenated segments. The private
+The public archive consists of fourteen concatenated segments. The public
 verification repository preserves 175,187 submitted Lean source files and
 the three project configuration files. The toolchain is Lean \code{v4.33.1},
 and the Mathlib pin is
 \nolinkurl{0df444a360eaa60ab8c11dca51a86af692955474}.
 \evid{evidence/archive.sha256}{Segment checksums}
-\evid{verification/build-on-yokota.sh}{Full build script}
+\evid{verification/build-on-slurm.sh}{Full build script}
 
 The evidence supports the analytic reductions under their stated inputs.
 The decisive pending check is whether the submitted arithmetic constructions

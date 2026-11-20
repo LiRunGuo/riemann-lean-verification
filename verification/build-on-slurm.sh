@@ -2,7 +2,7 @@
 set -euo pipefail
 umask 077
 
-work=${1:?usage: build-on-yokota.sh WORK_DIRECTORY}
+work=${1:?usage: build-on-slurm.sh WORK_DIRECTORY}
 if [[ ${2:-} == --resume ]]; then
     stage=$(cat "$work/build-directory")
     [[ -O "$stage" && -d "$stage/lean" ]]
